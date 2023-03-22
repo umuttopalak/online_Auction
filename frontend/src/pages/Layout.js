@@ -1,4 +1,5 @@
 import { Outlet, Link } from "react-router-dom";
+import { AuthProvider } from "react-auth-kit";
 
 const containerStyle = {
     padding: "5px",
@@ -38,6 +39,7 @@ export default function Layout() {
                 </div>
             </div >
             <Outlet />
+
         </>
     )
 };
