@@ -84,17 +84,17 @@ class ResponseMessage(BaseModel):
 
 
 @manager.user_loader()
-def load_user(mail: str):  # could also be an asynchronous function
-    return dbSorgu("select * from users where username=%s", (mail,), True)
+def load_user(email: str):  # could also be an asynchronous function
+    return dbSorgu("select * from users where mail=%s", (email,), True)
 
 
-@app.post('/auth/token')
+@app.post('/api/auth/token' , tags=["users"])
 def login(data: OAuth2PasswordRequestForm = Depends()):
-    username = data.username
+    email = data.username
     password = data.password
 
     # we are using the same function to retrieve the user
-    user = load_user(username)
+    user = load_user(email)
 
     if not user:
         raise InvalidCredentialsException  # you can also use your own HTTPException
@@ -102,14 +102,14 @@ def login(data: OAuth2PasswordRequestForm = Depends()):
         raise InvalidCredentialsException
 
     access_token = manager.create_access_token(
-        data=dict(sub=username)
+        data=dict(sub=email)
     )
     return {'access_token': access_token, 'token_type': 'bearer'}
 
 # Kullanıcı sorgu/kayıt
 
 
-@app.post("/register", response_model=ResponseMessage, tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
+@app.post("/api/register", response_model=ResponseMessage, tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
 def create_user(user: User, res: Response):
 
     mail = user.mail

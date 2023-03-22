@@ -19,7 +19,7 @@ const Register = () => {
         }
 
         const options = {
-            url: 'http://localhost:8000/register',
+            url: 'http://localhost:8000/api/register',
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
@@ -43,7 +43,7 @@ const Register = () => {
     }
 
     return (
-        <div className="App ">
+        <div className='App'>
             <div className="vh-100 d-flex justify-content-center align-items-center">
                 <div className="container">
                     <div className="row d-flex justify-content-center">
@@ -58,7 +58,7 @@ const Register = () => {
                                         </div>
                                         <div className="mb-3">
                                             <label htmlFor="email" className="form-label ">Email address</label>
-                                            <input value={mail} onChange={e => setMail(e.target.value)} type="mail" className="form-control" id="mail" placeholder="name@example.com" />
+                                            <input value={mail} onChange={e => setMail(e.target.value)} type="email" className="form-control" id="mail" placeholder="name@example.com" />
                                         </div>
                                         <div className="mb-3">
                                             <label htmlFor="password" className="form-label ">Password</label>
