@@ -1,13 +1,26 @@
-from typing import Union
-from fastapi import FastAPI, status, Body
-from dotenv import load_dotenv
 import os
 import psycopg2
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
+from typing import Union, Annotated
+import json
 
-load_dotenv()
+# fastapi requirements
+from fastapi import FastAPI, status, Body, Response, Request, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi_login import LoginManager
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi_login.exceptions import InvalidCredentialsException
+
+from pydantic import BaseModel, Field
+
+
+# region basta yapilacaklar
+
+
+SECRET = f'{os.urandom(24).hex()}'
+
+manager = LoginManager(SECRET, token_url='/auth/token')
+
 app = FastAPI()
 
 origins = [
@@ -18,7 +31,6 @@ origins = [
     # "https://localhost:3000/home"
     "*"
 ]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -26,6 +38,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+load_dotenv()
+# endregion
+
+# region DB
+
+# database bağlantısını yapar ve returnler
+
+
+def db():
+
+    url = os.environ.get("DATABASE_URL")
+    connection = psycopg2.connect(url)
+    return connection
+
+def dbSorgu(sql, data=(), one=False):
+    cur = db().cursor()
+    cur.execute(sql, data)
+    r = [dict((cur.description[i][0], value)
+              for i, value in enumerate(row)) for row in cur.fetchall()]
+    cur.connection.close()
+    return (r[0] if r else None) if one else r
+
+def dbPost(sql , data=()):
+    datab = db()
+    with datab:
+        datab.cursor().execute(sql, data)
+    
+# endregion
+
+# region siniflar
 
 
 class User(BaseModel):
@@ -38,43 +80,50 @@ class ResponseMessage(BaseModel):
     message: str
 
 
-url = os.environ.get("DATABASE_URL")  # gets variables from environment
-connection = psycopg2.connect(url)
-cursor = connection.cursor()
+# endregion
 
 
-async def mailCheck():
-
-    cursor.execute("SELECT * FROM users ")
-    result = cursor.fetchall()
-
-    mails = list()
-    for json in result:
-        mails.append(json[3])
-
-    return mails
-
-CREATE_USERS_TABLE = (
-    "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY,  username TEXT, mail TEXT , password TEXT);"
-)
+@manager.user_loader()
+def load_user(mail: str):  # could also be an asynchronous function
+    return dbSorgu("select * from users where username=%s", (mail,), True)
 
 
-# Kullanıcı sorgu/kayıt 
-@app.post("/register", response_model=ResponseMessage, tags=["users"])
-async def create_user(user: User):
+@app.post('/auth/token')
+def login(data: OAuth2PasswordRequestForm = Depends()):
+    username = data.username
+    password = data.password
 
-    _mails = await mailCheck()
+    # we are using the same function to retrieve the user
+    user = load_user(username)
+
+    if not user:
+        raise InvalidCredentialsException  # you can also use your own HTTPException
+    elif password != user['password']:
+        raise InvalidCredentialsException
+
+    access_token = manager.create_access_token(
+        data=dict(sub=username)
+    )
+    return {'access_token': access_token, 'token_type': 'bearer'}
+
+# Kullanıcı sorgu/kayıt
+
+
+@app.post("/register", response_model=ResponseMessage, tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
+def create_user(user: User, res: Response):
+
     mail = user.mail
     username = user.username
     password = user.password
 
-    stmt = "INSERT INTO users (username, mail , password) VALUES (%s, %s ,%s)"
+    user = dbSorgu("select * from users where mail=(%s)", (user.mail,), True)
 
-    if mail in _mails:
+    if user:
+        res.status_code = 400
         return {'message': 'kayitli'}
     else:
-        cursor.execute(stmt, (username, mail, password),)
-        connection.commit()
-        return {'message': 'kayit basarili'}    
+        res.status_code = 201
+        dbPost("insert into users (username , mail , password) values (%s , %s , %s)" , (username,mail,password))
+        return {'message': 'kayit basarili'}
 
 
