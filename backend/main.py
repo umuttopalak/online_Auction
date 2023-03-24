@@ -39,9 +39,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 load_dotenv()
+
+# endregion
+
+# region siniflar
+
+
+class Product(BaseModel):
+    id: int
+    name: str
+    lastprice: int
+    price: int
+
+
+class User(BaseModel):
+    username: str  # = Field(min_length=3, max_length=20)
+    mail: str
+    password: str  # = Field(min_length=6, max_length=20)
+
+
+class ResponseMessage(BaseModel):
+    message: str
+
+
 # endregion
 
 # region DB
+
+
+CREATE_USERS_TABLE = (
+    "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT, surname TEXT, mail TEXT , password TEXT);")
+CREATE_PRODUCTS_TABLE = (
+    "CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name TEXT, lastPrice INTEGER , price INTEGER, username TEXT);")
 
 # database bağlantısını yapar ve returnler
 
@@ -52,6 +81,7 @@ def db():
     connection = psycopg2.connect(url)
     return connection
 
+
 def dbSorgu(sql, data=(), one=False):
     cur = db().cursor()
     cur.execute(sql, data)
@@ -60,40 +90,49 @@ def dbSorgu(sql, data=(), one=False):
     cur.connection.close()
     return (r[0] if r else None) if one else r
 
-def dbPost(sql , data=()):
+
+def dbPost(sql, data=()):
     datab = db()
     with datab:
         datab.cursor().execute(sql, data)
-    
+        pass
+    datab.close()
+
+
+def addProducts():
+    # ürünleri database e ekler
+    product1 = Product(id=1, name="Duvar Saati", lastprice=0, price=400)
+    product2 = Product(id=2, name="Tablo", lastprice=0, price=1000)
+    product3 = Product(id=3, name="Ayna", lastprice=0, price=350)
+
+    dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
+           (product1.id, product1.name, product1.lastprice, product1.price))
+    dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
+           (product2.id, product2.name, product2.lastprice, product2.price))
+    dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
+           (product3.id, product3.name, product3.lastprice, product3.price))
+
+
+# tabloları oluşturur ve ürünleri ekler
+dbPost(CREATE_USERS_TABLE)
+dbPost(CREATE_PRODUCTS_TABLE)
+#addProducts()
+
 # endregion
 
-# region siniflar
-
-
-class User(BaseModel):
-    username: str = Field(min_length=3, max_length=20)
-    mail: str
-    password: str = Field(min_length=6, max_length=20)
-
-
-class ResponseMessage(BaseModel):
-    message: str
-
-
-# endregion
+# region Kullanıcı login/logout
 
 
 @manager.user_loader()
-def load_user(email: str):  # could also be an asynchronous function
+def load_user(email: str):
     return dbSorgu("select * from users where mail=%s", (email,), True)
 
 
-@app.post('/api/auth/token' , tags=["users"])
+@app.post('/api/user/auth/token', tags=["users"])
 def login(data: OAuth2PasswordRequestForm = Depends()):
     email = data.username
     password = data.password
 
-    # we are using the same function to retrieve the user
     user = load_user(email)
 
     if not user:
@@ -106,10 +145,8 @@ def login(data: OAuth2PasswordRequestForm = Depends()):
     )
     return {'access_token': access_token, 'token_type': 'bearer'}
 
-# Kullanıcı sorgu/kayıt
 
-
-@app.post("/api/register", response_model=ResponseMessage, tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
+@app.post("/api/user/register", response_model=ResponseMessage, tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
 def create_user(user: User, res: Response):
 
     mail = user.mail
@@ -123,7 +160,29 @@ def create_user(user: User, res: Response):
         return {'message': 'kayitli'}
     else:
         res.status_code = 201
-        dbPost("insert into users (username , mail , password) values (%s , %s , %s)" , (username,mail,password))
+        dbPost("insert into users (username , mail , password) values (%s , %s , %s)",
+               (username, mail, password))
         return {'message': 'kayit basarili'}
 
+# endregion
 
+# region Ürün işlemleri
+
+
+def load_product(id: int = None):
+    if id == None:
+        return dbSorgu("select * from products")
+
+    return dbSorgu("select * from products where id=%s", (id,), True)
+
+@app.get('/api/products/', tags=['Product'] )
+def get_products():
+    return load_product()
+
+
+@app.post('/api/product/update', tags=['Product'])
+def update_product():
+    pass
+
+
+# endregion

@@ -1,7 +1,5 @@
 import { Outlet,Link } from "react-router-dom";
 
-
-
 const containerStyle = {
     padding: "5px",
     overflow: "hidden",

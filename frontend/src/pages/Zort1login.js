@@ -18,7 +18,7 @@ const Login = () => {
         e.preventDefault();
 
         try {
-            axios.post('http://localhost:8000/api/auth/token',
+            axios.post('http://localhost:8000/api/user/auth/token',
                 `grant_type=&username=${email}&password=${password}&scope=&client_id=&client_secret=`, {
                 headers: {
                     'Accept': 'application/json',
