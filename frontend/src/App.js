@@ -40,10 +40,8 @@ function App() {
         cookieSecure={false}>
         <Router>
           <Routes>
-            <Route path="/">
-              <Route path="login" element={<LogRes />} />
-
-            </Route>
+            <Route path="/" element={<LogRes />} />
+            <Route path='/login' element={<LogRes/>}/>
             <Route path='/home' element={
               <RequireAuth loginPath='/login'><Auction />
               </RequireAuth>}>

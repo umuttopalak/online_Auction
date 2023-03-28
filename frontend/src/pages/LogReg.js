@@ -5,9 +5,9 @@ import { useSignIn } from 'react-auth-kit'
 import '../LogRegPage.css'
 import { useNavigate } from 'react-router-dom';
 
-
 const LogReg = () => {
 
+    const [showError, setError] = useState('')
     const [username, setUsername] = useState();
     const [email, setMail] = useState("");
     const [password, setPassword] = useState("");
@@ -38,7 +38,7 @@ const LogReg = () => {
             .then(response => {
                 if (response.status === 201) {
                     alert("yeyyy")
-                    
+
                 }
             }).catch((error) => {
                 if (error.response.status === 400) {
@@ -48,33 +48,46 @@ const LogReg = () => {
 
     }
 
-    const login = (e) => {
-        e.preventDefault();
 
-        try {
-            axios.post('http://localhost:8000/api/user/auth/token',
-                `grant_type=&username=${email}&password=${password}&scope=&client_id=&client_secret=`, {
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
+    const login = (e) => {
+        e.preventDefault()
+        axios.post('http://localhost:8000/api/user/auth/token',
+            `grant_type=&username=${email}&password=${password}&scope=&client_id=&client_secret=`, {
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
-            ).then((response) => {
-                console.log(response.data);
-                signIn({
-                    token: response.data.access_token,
-                    expiresIn: 300,
-                    tokenType: response.data.token_type,
-                    authState: { email: email }
-                })
-                navigate('/home');
-                
-            }).catch((error) => {
-                console.error(error);
-            });
-        } catch (err) {
-            console.log(err.message)
-        }
+        })
+            .then((res) => {
+                if (res.status === 200) {
+                    if (signIn(
+                        {
+                            token: res.data.token,
+                            expiresIn: 3600,
+                            tokenType: res.data.tokenType,
+                            authState: { 'username:': res.data.username },
+                        }
+                    )) { // Only if you are using refreshToken feature
+                        navigate('/home');
+                    } else {
+                        //Throw error
+                    }
+                }
+            }).catch((axiosError) => {
+                if (axiosError.response) {
+                    if (axiosError.response.status === 401) {
+                        console.log(axiosError);
+                        setError(true);
+                    }
+                } else if (axiosError.request) {
+                    // İstek gönderilirken bir hata oluştu
+                    console.log(axiosError.request);
+                    console.log("abo")
+                } else {
+                    // Diğer hatalar
+                    console.log('Error', axiosError.message);
+                }
+            })
     }
 
     return (
@@ -101,6 +114,8 @@ const LogReg = () => {
                                                         <input value={password} onChange={e => setPassword(e.target.value)} type="password" name="password" className="form-style" placeholder="Your Password" id="password" autocomplete="off" />
                                                         <i className="input-icon uil uil-lock-alt"></i>
                                                     </div>
+                                                    <br />
+                                                    {showError && <p style={{ color: 'red' }}>Email or Password is Incorrect</p>}
                                                     <button className="btn mt-4" type='submit'>Submit</button>
                                                 </div>
                                             </form>

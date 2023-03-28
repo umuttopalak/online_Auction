@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 
 import psycopg2
 import psycopg2.extras
@@ -16,7 +17,7 @@ from pydantic import BaseModel, Field
 
 
 # region basta yapilacaklar
-
+load_dotenv()
 
 SECRET = f'{os.urandom(24).hex()}'
 
@@ -24,8 +25,8 @@ manager = LoginManager(SECRET, token_url='/auth/token')
 
 app = FastAPI()
 
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 origins = [
     # "http://localhost.tiangolo.com",
@@ -83,7 +84,9 @@ CREATE_BIDS_TABLE = ("CREATE TABLE IF NOT EXISTS bids (id SERIAL PRIMARY KEY,auc
 
 def db():
 
-    connection = psycopg2.connect("DATABASE_URL")
+    connection = psycopg2.connect("myuser:mypassword@db:5432/mydatabase"
+    
+)
     connection.autocommit = True
     return connection
 
@@ -128,7 +131,7 @@ dbPost(CREATE_USERS_TABLE)
 dbPost(CREATE_PRODUCTS_TABLE)
 dbPost(CREATE_AUCTIONS_TABLE)
 dbPost(CREATE_BIDS_TABLE)
-#addProducts()
+addProducts()
 
 # endregion
 
@@ -205,6 +208,3 @@ def update_product(product: Product, username: str, res: Response):
 
 # endregion
 
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", port=5000, log_level="info")
