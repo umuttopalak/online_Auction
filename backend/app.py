@@ -1,11 +1,12 @@
 import os
-import psycopg2
-from dotenv import load_dotenv
-from typing import Union, Annotated
-import json
 
+import psycopg2
+import psycopg2.extras
+
+from typing import Union, Annotated
+import uvicorn
 # fastapi requirements
-from fastapi import FastAPI, status, Body, Response, Request, Depends
+from fastapi import FastAPI, status, Body, Response, Request, Depends, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_login import LoginManager
 from fastapi.security import OAuth2PasswordRequestForm
@@ -23,6 +24,9 @@ manager = LoginManager(SECRET, token_url='/auth/token')
 
 app = FastAPI()
 
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 origins = [
     # "http://localhost.tiangolo.com",
     # "https://localhost.tiangolo.com",
@@ -38,11 +42,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-load_dotenv()
 
 # endregion
 
 # region siniflar
+
+
+class User(BaseModel):
+    username: str  # = Field(min_length=3, max_length=20)
+    mail: str
+    password: str  # = Field(min_length=6, max_length=20)
 
 
 class Product(BaseModel):
@@ -50,12 +59,6 @@ class Product(BaseModel):
     name: str
     lastprice: int
     price: int
-
-
-class User(BaseModel):
-    username: str  # = Field(min_length=3, max_length=20)
-    mail: str
-    password: str  # = Field(min_length=6, max_length=20)
 
 
 class ResponseMessage(BaseModel):
@@ -66,20 +69,27 @@ class ResponseMessage(BaseModel):
 
 # region DB
 
-
 CREATE_USERS_TABLE = (
-    "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT, surname TEXT, mail TEXT , password TEXT);")
-CREATE_PRODUCTS_TABLE = (
-    "CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name TEXT, lastPrice INTEGER , price INTEGER, username TEXT);")
+    "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT,mail TEXT ,password TEXT)")
 
-# database bağlantısını yapar ve returnler
+CREATE_PRODUCTS_TABLE = (
+    "CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY,name TEXT, lastPrice INTEGER ,price INTEGER, username TEXT)""")
+
+CREATE_AUCTIONS_TABLE = (
+    "CREATE TABLE IF NOT EXISTS auctions (id SERIAL PRIMARY KEY,name VARCHAR(255) NOT NULL,start_price NUMERIC(10, 2) NOT NULL,end_time TIMESTAMP NOT NULL)")
+
+CREATE_BIDS_TABLE = ("CREATE TABLE IF NOT EXISTS bids (id SERIAL PRIMARY KEY,auction_id INTEGER REFERENCES auctions(id),user_id INTEGER NOT NULL,amount NUMERIC(10, 2) NOT NULL,timestamp TIMESTAMP NOT NULL)")
 
 
 def db():
 
-    url = os.environ.get("DATABASE_URL")
-    connection = psycopg2.connect(url)
+    connection = psycopg2.connect("DATABASE_URL")
+    connection.autocommit = True
     return connection
+
+
+def dbWebSocketCursor():
+    return db().cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 
 def dbSorgu(sql, data=(), one=False):
@@ -116,6 +126,8 @@ def addProducts():
 # tabloları oluşturur ve ürünleri ekler
 dbPost(CREATE_USERS_TABLE)
 dbPost(CREATE_PRODUCTS_TABLE)
+dbPost(CREATE_AUCTIONS_TABLE)
+dbPost(CREATE_BIDS_TABLE)
 #addProducts()
 
 # endregion
@@ -134,7 +146,7 @@ def login(data: OAuth2PasswordRequestForm = Depends()):
     password = data.password
 
     user = load_user(email)
-
+    print(user)
     if not user:
         raise InvalidCredentialsException  # you can also use your own HTTPException
     elif password != user['password']:
@@ -143,7 +155,8 @@ def login(data: OAuth2PasswordRequestForm = Depends()):
     access_token = manager.create_access_token(
         data=dict(sub=email)
     )
-    return {'access_token': access_token, 'token_type': 'bearer'}
+
+    return {'username': user['username'], 'token': access_token, 'tokenType': 'bearer'}
 
 
 @app.post("/api/user/register", response_model=ResponseMessage, tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
@@ -171,18 +184,27 @@ def create_user(user: User, res: Response):
 
 def load_product(id: int = None):
     if id == None:
-        return dbSorgu("select * from products")
+        return dbSorgu("select * from products order by id")
 
     return dbSorgu("select * from products where id=%s", (id,), True)
 
-@app.get('/api/products/', tags=['Product'] )
+
+@app.get('/api/products', tags=['Products'])
 def get_products():
     return load_product()
 
 
-@app.post('/api/product/update', tags=['Product'])
-def update_product():
-    pass
+@app.post('/api/product/update', tags=['Products'], response_model=ResponseMessage)
+def update_product(product: Product, username: str, res: Response):
 
+    dbPost("UPDATE products SET lastprice = %s WHERE id= %s",
+           (product.lastprice, product.id))
+    dbPost("UPDATE products SET username = %s WHERE id= %s",
+           (username, product.id))
+    return {'message': 'asd'}
 
 # endregion
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", port=5000, log_level="info")
