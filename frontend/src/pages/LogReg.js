@@ -2,8 +2,8 @@ import React from 'react';
 import axios from 'axios';
 import { useState } from 'react';
 import { useSignIn } from 'react-auth-kit'
-import '../LogRegPage.css'
 import { useNavigate } from 'react-router-dom';
+import '../LogRegPage.css'
 
 const LogReg = () => {
 

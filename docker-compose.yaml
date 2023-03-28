@@ -1,0 +1,47 @@
+version: "3.9"
+services:
+  db:
+    container_name: postgres
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secretpass
+      POSTGRES_DB: database
+    ports:
+      - "5432:5432"
+
+    #localde yedekleme
+    # volumes:
+    #   - ./data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  api:
+    container_name: fastapi
+    build: ./backend
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:secretpass@db:5432/database
+
+  react-app:
+    container_name: react-app
+    image: react-image:latest
+    build: ./frontend
+    # volumes:
+    #   - ./src:/app/src
+    ports:
+      - 3000:80

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import '../LogRegPage.css'
 function Auction(props) {
   const [products, setProducts] = useState([]);
 
