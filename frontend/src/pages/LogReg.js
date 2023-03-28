@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useState } from 'react';
 import { useSignIn } from 'react-auth-kit'
 import { useNavigate } from 'react-router-dom';
-import '../LogRegPage.css'
+
 
 const LogReg = () => {
 

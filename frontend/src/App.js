@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import LogRes from './pages/LogReg';
 import { AuthProvider, RequireAuth } from 'react-auth-kit';
 import Auction from './pages/Auction';
-
+import './LogRegPage.css'
 
 function App() {
 
