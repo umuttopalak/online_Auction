@@ -124,7 +124,7 @@ def addProducts():
     # ürünleri database e ekler
     if sorgu[0]['count'] == 0:
 
-        product1 = Product(id=1, name="Duvar Saati", lastprice=0, price=400)
+        product1 = Product(id=1, name="Cep Saati", lastprice=0, price=400)
         product2 = Product(id=2, name="Tablo", lastprice=0, price=1000)
         product3 = Product(id=3, name="Ayna", lastprice=0, price=350)
 
@@ -234,10 +234,10 @@ async def websocket_endpoint(websocket: WebSocket):
                            (message["bid"], message["username"], message["id"],))
                     await wsManager.broadcast(dbSorgu("select * from products order by id"))
 
+
     except WebSocketDisconnect:
         wsManager.disconnect(websocket)
-        message = {"message": "Offline"}
-        await websocket.send_json(message)
+    
 
 
 # endregion
