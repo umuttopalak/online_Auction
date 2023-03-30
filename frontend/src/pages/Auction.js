@@ -1,57 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import '../LogRegPage.css'
 import useWs from '../hooks/useWs';
+import { useAuthUser } from 'react-auth-kit'
+
 
 function Auction(props) {
 
-  const [products, setProducts] = useState([]);
+  const { sendMessage, messages } = useWs("ws://localhost:8000/ws");
 
-  const offer = (product) => {
+  const auth = useAuthUser()
+  const username_ = auth().username
 
-    let _product = {
-      'id': product.id,
-      'name': product.name,
-      'price': product.price,
-      'lastprice': product.lastprice,
-      'username': props.username
+  const handleClick = (productId, productPrice, productLastPrice) => {
+    
+    if(productLastPrice === 0){
+      productLastPrice = productPrice;
     }
-  }
-
-  const { sendMessage } = useWs("ws://localhost:8000/ws");
-
-  const handleClick = () => {
     
     const message = {
       type: 'set_bid',
-      id: 1,
-      username: props.username,
-      bid: lastprice + 50
+      id: productId,
+      username: username_,
+      bid: productLastPrice + 50
     }
     const messageJson = JSON.stringify(message)
     sendMessage(messageJson)
 
   };
 
+  //#region DATABASEDEN PRODUCTSLARI ÇEKME
+  //const [products, setProducts] = useState([]);  
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     const result = await fetch('http://localhost:8000/api/products');
+  //     const data = await result.json();
+  //     setProducts(data);
+  //   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const result = await fetch('http://localhost:8000/api/products');
-      const data = await result.json();
-      setProducts(data);
-    };
+  //   fetchData();
+  //   const interval = setInterval(() => {
+  //     fetchData();
+  //   }, 10000); // 10 saniyede bir sorgula
 
-    fetchData();
-    const interval = setInterval(() => {
-      fetchData();
-    }, 10000); // 10 saniyede bir sorgula
-
-    return () => clearInterval(interval);
-  }, []);
+  //   return () => clearInterval(interval);
+  // }, []);
+  //#endregion
 
   return (
     <div className='justify-content-center'>
-      {products.map(product => (
-        <section>
+      {messages.map(product => (
+        <section key={product.id} id={product.id}>
           <div className="container py-5">
             <div className="row justify-content-center mb-3">
               <div className="col-md-12 col-xl-10">
@@ -81,13 +79,14 @@ function Auction(props) {
                       <div className="col-md-6 col-lg-3 col-xl-3 border-sm-start-none border-horizontal">
                         <br />
                         <div className="d-flex flex-row align-items-center mb-1">
-                          <h4 className="mb-1 me-1">{product.price} TL</h4>
-                          <span className="text-nowrap">{product.lastprice === 0 ? ("Teklif Verilmedi") : <>{product.price}</>}</span>
+                          <h4 className="mb-1 me-1">{product.lastprice === 0 ? product.price : product.lastprice} TL</h4>
+                          <span className="text-nowrap">{product.lastprice === 0 ? ("Teklif Verilmedi") : <>{product.price} TL</>}</span>
+
                         </div>
                         <h6 className="">Kargo Ücreti Yok</h6>
                         <div className="d-flex flex-column mt-4">
                           <button className="btn" type="button" onClick={() => {
-                            handleClick()
+                            handleClick(product.id, product.price , product.lastprice)
                           }}>Teklif Ver</button>
                         </div>
                       </div>
@@ -102,14 +101,6 @@ function Auction(props) {
       }
     </div >
 
-  );
-
-  
-
-  return (
-    <div>
-      <button onClick={handleClick}>Send Message</button>
-    </div>
   );
 
 }

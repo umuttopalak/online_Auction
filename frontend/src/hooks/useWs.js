@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from "react";
 const useWs = (url) => {
     const [ws, setWs] = useState(null);
     const messageQueueRef = useRef([]);
+    const [messages, setMessages] = useState([]);
+
 
     useEffect(() => {
         const socket = new WebSocket(url);
         setWs(socket);
-
         // clean up function
         return () => {
             socket.close();
@@ -24,8 +25,19 @@ const useWs = (url) => {
                     ws.send(JSON.stringify(message));
                 }
             };
+
         }
     }, [ws]);
+
+    useEffect(() => {
+        if (ws) {
+            ws.onmessage = (event) => {
+                setMessages(JSON.parse(event.data))
+            };
+
+        }
+    }, [ws]);
+
 
     const sendMessage = (message) => {
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -37,7 +49,7 @@ const useWs = (url) => {
         }
     };
 
-    return { ws, sendMessage };
+    return { ws, sendMessage, messages };
 };
 
 export default useWs;

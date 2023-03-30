@@ -61,6 +61,24 @@ class ResponseMessage(BaseModel):
     message: str
 
 
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_json(message)
+
+
+wsManager = ConnectionManager()
+
 # endregion
 
 # region DB
@@ -138,7 +156,6 @@ def login(data: OAuth2PasswordRequestForm = Depends()):
     password = data.password
 
     user = load_user(email)
-    print(user)
     if not user:
         raise InvalidCredentialsException  # you can also use your own HTTPException
     elif password != user['password']:
@@ -197,52 +214,30 @@ def update_product(product: Product, username: str, res: Response):
 
 # endregion
 
-
-# region cinnet
-
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_json(message)
-
-wsManager = ConnectionManager()
+# region Açık Arttırma WS
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await wsManager.connect(websocket)
-    await wsManager.broadcast(dbSorgu("select * from products"))
+    await websocket.send_json(dbSorgu("select * from products order by id"))
     try:
         while True:
             message = await websocket.receive_json()
-            print(message)
             if message["type"] == "get_bid":
-                product = load_product(message['id'])
+                product = load_product(message["id"])
                 await wsManager.broadcast(product)
 
             elif message["type"] == "set_bid":
-                if load_product(message['id']) != None:
+                if load_product(message["id"]) != None:
                     dbPost(("UPDATE products SET lastprice=%s ,username=%s WHERE id = %s"),
-                           (message['bid'], message['username'], message['id'],))
-                    await wsManager.broadcast(load_product(message['id']))
-        
-        
+                           (message["bid"], message["username"], message["id"],))
+                    await wsManager.broadcast(dbSorgu("select * from products order by id"))
+
     except WebSocketDisconnect:
         wsManager.disconnect(websocket)
         message = {"message": "Offline"}
-        await wsManager.broadcast(message)
+        await websocket.send_json(message)
 
 
 # endregion

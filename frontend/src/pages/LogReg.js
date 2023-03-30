@@ -65,7 +65,7 @@ const LogReg = () => {
                             token: res.data.token,
                             expiresIn: 3600,
                             tokenType: res.data.tokenType,
-                            authState: { 'username:': res.data.username },
+                            authState: { 'username': res.data.username },
                         }
                     )) { // Only if you are using refreshToken feature
                         navigate('/home');
