@@ -1,22 +1,31 @@
 import React from 'react';
-import '../LogRegPage.css'
 import useWs from '../hooks/useWs';
-import { useAuthUser } from 'react-auth-kit'
-
-
+import { useSignOut, useAuthUser } from 'react-auth-kit'
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 function Auction(props) {
 
-  const { sendMessage, messages } = useWs("ws://localhost:8000/ws");
 
+  //  SAYFA YENİLENDİĞİNDE VEYA KAPATILDĞIĞINDA OTOMATİK LOGOUT
+
+  const signOut = useSignOut()
+  const { sendMessage, messages } = useWs("ws://localhost:8000/ws");
   const auth = useAuthUser()
   const username_ = auth().username
+  const navigate = useNavigate();
+
+  const logOut = () => {
+    signOut()
+    navigate("/login")
+  }
+
 
   const handleClick = (productId, productPrice, productLastPrice) => {
-    
-    if(productLastPrice === 0){
+
+    if (productLastPrice === 0) {
       productLastPrice = productPrice;
     }
-    
+
     const message = {
       type: 'set_bid',
       id: productId,
@@ -27,6 +36,7 @@ function Auction(props) {
     sendMessage(messageJson)
 
   };
+
 
   //#region DATABASEDEN PRODUCTSLARI ÇEKME
   //const [products, setProducts] = useState([]);  
@@ -47,62 +57,37 @@ function Auction(props) {
   //#endregion
 
   return (
-    <div className='justify-content-center'>
-      {messages.map(product => (
-        <section key={product.id} id={product.id}>
-          <div className="container py-5">
-            <div className="row justify-content-center mb-3">
-              <div className="col-md-12 col-xl-10">
-                <div className="">
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-md-12 col-lg-3 col-xl-3 mb-4 mb-lg-0">
-                        <div className="bg-image hover-zoom ripple rounded ripple-surface">
-                          <img src="https://mdbcdn.b-cdn.net/img/Photos/Horizontal/E-commerce/Products/img%20(4).webp" alt='Resim Bulunamadı'
-                            className="w-100" />
-                          <a href="#!">
-                            <div className="hover-overlay">
-                              <div className="mask"></div>
-                            </div>
-                          </a>
-                        </div>
-                      </div>
-                      <div className="col-md-6 col-lg-6 col-xl-6">
-                        <br />
-                        <h5>Quant trident shirts</h5>
-                        <div className="d-flex flex-row">
-                          <div className="text-danger mb-1 me-2">
-                            <i className="fa fa-star">{product.username}</i>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-md-6 col-lg-3 col-xl-3 border-sm-start-none border-horizontal">
-                        <br />
-                        <div className="d-flex flex-row align-items-center mb-1">
-                          <h4 className="mb-1 me-1">{product.lastprice === 0 ? product.price : product.lastprice} TL</h4>
-                          <span className="text-nowrap">{product.lastprice === 0 ? ("Teklif Verilmedi") : <>{product.price} TL</>}</span>
+    <>
+      <div className="exit-button"><button className='btn' onClick={() => {
+        logOut()
+      }}>Log Out</button></div>
 
-                        </div>
-                        <h6 className="">Kargo Ücreti Yok</h6>
-                        <div className="d-flex flex-column mt-4">
-                          <button className="btn" type="button" onClick={() => {
-                            handleClick(product.id, product.price , product.lastprice)
-                          }}>Teklif Ver</button>
-                        </div>
-                      </div>
-                    </div>
+      {messages.map((product) => (
+        <div id={product.id} className="container py-5 d-flex justify-content-center">
+          <div className="col-md-4">
+            <div className="card mb-4 shadow-sm" style={{ "border": "0px" }}>
+              <img className="card-img-top" src={require('../photos/' + product.id + '.jpg')} alt="bulunamadı" />
+              <div className="card-body" style={{ border: "0px !important", borderRadius: "0px !important" }}>
+                <h5 className="card-title">{product.name}</h5>
+                <p className="card-text"><strong>Son Teklifi Veren:</strong> {product.username === null ? ("Henüz Teklif Verilmedi") : product.username}</p>
+                <p className="card-text"><strong>En Yüksek Teklif: </strong>{product.lastprice === 0 ? "Teklif Verilmedi" : `${product.lastprice} TL`}</p>
+                <p className="card-text"><strong>Başlangıç Fiyatı: </strong>{product.price}</p>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div className="btn-group">
+                    {product.username === username_ ? (
+                      <p className="btn">TEKLİF VERİLDİ</p>
+                    ) : (
+                      <button className="btn" type="button" onClick={() => handleClick(product.id, product.price, product.lastprice)}>Teklif Ver</button>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </section >
-      ))
-      }
-    </div >
-
-  );
-
+        </div >
+      ))}
+    </>
+  )
 }
 
 
