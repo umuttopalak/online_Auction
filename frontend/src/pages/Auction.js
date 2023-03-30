@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import '../LogRegPage.css'
+
 function Auction(props) {
+
   const [products, setProducts] = useState([]);
 
   const offer = (product) => {
 
     let _product = {
       'id': product.id,
-      'name' : product.name,
-      'price' : product.price,
-      'lastprice' : product.lastprice,
-       'username' :props.username  }
+      'name': product.name,
+      'price': product.price,
+      'lastprice': product.lastprice,
+      'username': props.username
+    }
   }
 
   useEffect(() => {
@@ -29,8 +32,10 @@ function Auction(props) {
   }, []);
 
 
+
+
   return (
-    <div className='justify-content-center'>    
+    <div className='justify-content-center'>
       {products.map(product => (
         <section>
           <div class="container py-5">
@@ -51,7 +56,7 @@ function Auction(props) {
                         </div>
                       </div>
                       <div class="col-md-6 col-lg-6 col-xl-6">
-                        <br/>
+                        <br />
                         <h5>Quant trident shirts</h5>
                         <div class="d-flex flex-row">
                           <div class="text-danger mb-1 me-2">
@@ -60,7 +65,7 @@ function Auction(props) {
                         </div>
                       </div>
                       <div class="col-md-6 col-lg-3 col-xl-3 border-sm-start-none border-horizontal">
-                        <br/>
+                        <br />
                         <div class="d-flex flex-row align-items-center mb-1">
                           <h4 class="mb-1 me-1">{product.price} TL</h4>
                           <span class="text-nowrap">{product.lastprice === 0 ? ("Teklif Verilmedi") : <>{product.price}</>}</span>
@@ -82,6 +87,7 @@ function Auction(props) {
       ))
       }
     </div >
+ 
   );
 }
 

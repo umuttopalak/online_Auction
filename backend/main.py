@@ -1,12 +1,12 @@
 import os
 from dotenv import load_dotenv
-from urllib.parse import quote_plus
 import psycopg2
 import psycopg2.extras
-from typing import Union, Annotated
+from typing import Union, Annotated, List
 import uvicorn
 # fastapi requirements
-from fastapi import FastAPI, status, Body, Response, Request, Depends, WebSocket
+
+from fastapi import FastAPI, status, Body, Response, Request, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_login import LoginManager
 from fastapi.security import OAuth2PasswordRequestForm
@@ -21,7 +21,6 @@ load_dotenv()
 SECRET = f'{os.urandom(24).hex()}'
 
 manager = LoginManager(SECRET, token_url='/auth/token')
-
 app = FastAPI()
 
 origins = [
@@ -72,25 +71,15 @@ CREATE_USERS_TABLE = (
 CREATE_PRODUCTS_TABLE = (
     "CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY,name TEXT, lastPrice INTEGER ,price INTEGER, username TEXT)""")
 
-CREATE_AUCTIONS_TABLE = (
-    "CREATE TABLE IF NOT EXISTS auctions (id SERIAL PRIMARY KEY,name VARCHAR(255) NOT NULL,start_price NUMERIC(10, 2) NOT NULL,end_time TIMESTAMP NOT NULL)")
-
-CREATE_BIDS_TABLE = ("CREATE TABLE IF NOT EXISTS bids (id SERIAL PRIMARY KEY,auction_id INTEGER REFERENCES auctions(id),user_id INTEGER NOT NULL,amount NUMERIC(10, 2) NOT NULL,timestamp TIMESTAMP NOT NULL)")
-
 
 def db():
     database_url = os.environ.get("DATABASE_URL")
-    print(database_url)
     if not database_url:
         raise ValueError("DATABASE_URL environment variable not set")
-    
+
     connection = psycopg2.connect(database_url)
     connection.autocommit = True
     return connection
-
-
-def dbWebSocketCursor():
-    return db().cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 
 def dbSorgu(sql, data=(), one=False):
@@ -111,24 +100,26 @@ def dbPost(sql, data=()):
 
 
 def addProducts():
+
+    sorgu = dbSorgu("SELECT COUNT(*) FROM products")
+
     # ürünleri database e ekler
-    product1 = Product(id=1, name="Duvar Saati", lastprice=0, price=400)
-    product2 = Product(id=2, name="Tablo", lastprice=0, price=1000)
-    product3 = Product(id=3, name="Ayna", lastprice=0, price=350)
+    if sorgu[0]['count'] == 0:
 
-    dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
-           (product1.id, product1.name, product1.lastprice, product1.price))
-    dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
-           (product2.id, product2.name, product2.lastprice, product2.price))
-    dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
-           (product3.id, product3.name, product3.lastprice, product3.price))
+        product1 = Product(id=1, name="Duvar Saati", lastprice=0, price=400)
+        product2 = Product(id=2, name="Tablo", lastprice=0, price=1000)
+        product3 = Product(id=3, name="Ayna", lastprice=0, price=350)
+
+        dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
+               (product1.id, product1.name, product1.lastprice, product1.price))
+        dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
+               (product2.id, product2.name, product2.lastprice, product2.price))
+        dbPost("insert into products (id , name , lastprice, price) values (%s, %s, %s , %s)",
+               (product3.id, product3.name, product3.lastprice, product3.price))
 
 
-# tabloları oluşturur ve ürünleri ekler
 dbPost(CREATE_USERS_TABLE)
 dbPost(CREATE_PRODUCTS_TABLE)
-dbPost(CREATE_AUCTIONS_TABLE)
-dbPost(CREATE_BIDS_TABLE)
 addProducts()
 
 # endregion
@@ -206,6 +197,53 @@ def update_product(product: Product, username: str, res: Response):
 
 # endregion
 
+
+# region cinnet
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_json(message)
+
+
+wsManager = ConnectionManager()
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await wsManager.connect(websocket)
+    await wsManager.broadcast(dbSorgu("select * from products"))
+    try:
+        while True:
+            message = await websocket.receive_json()
+            if message['type'] == 'get_bid':
+                product = load_product(message['id'])
+                await wsManager.broadcast(product)
+
+            elif message['type'] == 'set_bid':
+                if load_product(message['id']) != None:
+                    dbPost(("UPDATE products SET lastprice=%s ,username=%s WHERE id = %s"),
+                           (message['bid'], message['username'], message['id'],))
+                    await wsManager.broadcast(load_product(message['id']))
+
+    except WebSocketDisconnect:
+        wsManager.disconnect(websocket)
+        message = {"message": "Offline"}
+        await wsManager.broadcast(message)
+
+
+# endregion
 
 # if __name__ == "__main__":
 #     uvicorn.run(app, host="0.0.0.0", port=8000)
