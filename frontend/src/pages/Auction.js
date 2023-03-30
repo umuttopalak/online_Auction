@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../LogRegPage.css'
+import useWs from '../hooks/useWs';
 
 function Auction(props) {
 
@@ -16,6 +17,22 @@ function Auction(props) {
     }
   }
 
+  const { sendMessage } = useWs("ws://localhost:8000/ws");
+
+  const handleClick = () => {
+    
+    const message = {
+      type: 'set_bid',
+      id: 1,
+      username: props.username,
+      bid: lastprice + 50
+    }
+    const messageJson = JSON.stringify(message)
+    sendMessage(messageJson)
+
+  };
+
+
   useEffect(() => {
     const fetchData = async () => {
       const result = await fetch('http://localhost:8000/api/products');
@@ -31,49 +48,46 @@ function Auction(props) {
     return () => clearInterval(interval);
   }, []);
 
-
-
-
   return (
     <div className='justify-content-center'>
       {products.map(product => (
         <section>
-          <div class="container py-5">
-            <div class="row justify-content-center mb-3">
-              <div class="col-md-12 col-xl-10">
-                <div class="">
-                  <div class="card-body">
-                    <div class="row">
-                      <div class="col-md-12 col-lg-3 col-xl-3 mb-4 mb-lg-0">
-                        <div class="bg-image hover-zoom ripple rounded ripple-surface">
+          <div className="container py-5">
+            <div className="row justify-content-center mb-3">
+              <div className="col-md-12 col-xl-10">
+                <div className="">
+                  <div className="card-body">
+                    <div className="row">
+                      <div className="col-md-12 col-lg-3 col-xl-3 mb-4 mb-lg-0">
+                        <div className="bg-image hover-zoom ripple rounded ripple-surface">
                           <img src="https://mdbcdn.b-cdn.net/img/Photos/Horizontal/E-commerce/Products/img%20(4).webp" alt='Resim Bulunamadı'
-                            class="w-100" />
+                            className="w-100" />
                           <a href="#!">
-                            <div class="hover-overlay">
-                              <div class="mask"></div>
+                            <div className="hover-overlay">
+                              <div className="mask"></div>
                             </div>
                           </a>
                         </div>
                       </div>
-                      <div class="col-md-6 col-lg-6 col-xl-6">
+                      <div className="col-md-6 col-lg-6 col-xl-6">
                         <br />
                         <h5>Quant trident shirts</h5>
-                        <div class="d-flex flex-row">
-                          <div class="text-danger mb-1 me-2">
-                            <i class="fa fa-star">{product.username}</i>
+                        <div className="d-flex flex-row">
+                          <div className="text-danger mb-1 me-2">
+                            <i className="fa fa-star">{product.username}</i>
                           </div>
                         </div>
                       </div>
-                      <div class="col-md-6 col-lg-3 col-xl-3 border-sm-start-none border-horizontal">
+                      <div className="col-md-6 col-lg-3 col-xl-3 border-sm-start-none border-horizontal">
                         <br />
-                        <div class="d-flex flex-row align-items-center mb-1">
-                          <h4 class="mb-1 me-1">{product.price} TL</h4>
-                          <span class="text-nowrap">{product.lastprice === 0 ? ("Teklif Verilmedi") : <>{product.price}</>}</span>
+                        <div className="d-flex flex-row align-items-center mb-1">
+                          <h4 className="mb-1 me-1">{product.price} TL</h4>
+                          <span className="text-nowrap">{product.lastprice === 0 ? ("Teklif Verilmedi") : <>{product.price}</>}</span>
                         </div>
-                        <h6 class="">Kargo Ücreti Yok</h6>
-                        <div class="d-flex flex-column mt-4">
-                          <button class="btn" type="button" onClick={() => {
-                            offer(product)
+                        <h6 className="">Kargo Ücreti Yok</h6>
+                        <div className="d-flex flex-column mt-4">
+                          <button className="btn" type="button" onClick={() => {
+                            handleClick()
                           }}>Teklif Ver</button>
                         </div>
                       </div>
@@ -87,8 +101,18 @@ function Auction(props) {
       ))
       }
     </div >
- 
+
   );
+
+  
+
+  return (
+    <div>
+      <button onClick={handleClick}>Send Message</button>
+    </div>
+  );
+
 }
+
 
 export default Auction;

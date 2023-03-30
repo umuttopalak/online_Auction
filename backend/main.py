@@ -5,7 +5,7 @@ import psycopg2.extras
 from typing import Union, Annotated, List
 import uvicorn
 # fastapi requirements
-
+import json
 from fastapi import FastAPI, status, Body, Response, Request, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_login import LoginManager
@@ -212,10 +212,10 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
+
     async def broadcast(self, message: str):
         for connection in self.active_connections:
             await connection.send_json(message)
-
 
 wsManager = ConnectionManager()
 
@@ -227,16 +227,18 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             message = await websocket.receive_json()
-            if message['type'] == 'get_bid':
+            print(message)
+            if message["type"] == "get_bid":
                 product = load_product(message['id'])
                 await wsManager.broadcast(product)
 
-            elif message['type'] == 'set_bid':
+            elif message["type"] == "set_bid":
                 if load_product(message['id']) != None:
                     dbPost(("UPDATE products SET lastprice=%s ,username=%s WHERE id = %s"),
                            (message['bid'], message['username'], message['id'],))
                     await wsManager.broadcast(load_product(message['id']))
-
+        
+        
     except WebSocketDisconnect:
         wsManager.disconnect(websocket)
         message = {"message": "Offline"}
