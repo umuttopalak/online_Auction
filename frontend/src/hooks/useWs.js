@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import axios from "axios";
 
 const useWs = (url) => {
     const [ws, setWs] = useState(null);
     const messageQueueRef = useRef([]);
     const [messages, setMessages] = useState([]);
-
 
     useEffect(() => {
         const socket = new WebSocket(url);
