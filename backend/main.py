@@ -1,27 +1,31 @@
 import os
-from dotenv import load_dotenv
+from typing import List, Union
+from datetime import datetime, timedelta
+import jwt
 import psycopg2
 import psycopg2.extras
-from typing import Union, Annotated, List
-import uvicorn
-# fastapi requirements
-import json
-from fastapi import FastAPI, status, Body, Response, Request, Depends, WebSocket, WebSocketDisconnect
+import redis
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect, status, Body, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi_login import LoginManager
-from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_login.exceptions import InvalidCredentialsException
-
 from pydantic import BaseModel, Field
 
+SECRET_KEY = "secretkey"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# region basta yapilacaklar
+# .env dosyasından değişkenleri al
+
 load_dotenv()
 
-SECRET = f'{os.urandom(24).hex()}'
 
-manager = LoginManager(SECRET, token_url='/auth/token')
+# region api tanımlamaları
+
 app = FastAPI()
+security = HTTPBasic()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 origins = [
     # "http://localhost.tiangolo.com",
@@ -41,13 +45,13 @@ app.add_middleware(
 
 # endregion
 
-# region siniflar
 
+# region Classlar
 
 class User(BaseModel):
-    username: str  # = Field(min_length=3, max_length=20)
-    mail: str
-    password: str  # = Field(min_length=6, max_length=20)
+    username: str
+    email: str
+    password: str
 
 
 class Product(BaseModel):
@@ -60,28 +64,10 @@ class Product(BaseModel):
 class ResponseMessage(BaseModel):
     message: str
 
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_json(message)
-
-
-wsManager = ConnectionManager()
-
 # endregion
 
-# region DB
+
+# region Database
 
 CREATE_USERS_TABLE = (
     "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT,mail TEXT ,password TEXT)")
@@ -142,53 +128,61 @@ addProducts()
 
 # endregion
 
-# region Kullanıcı login/logout
+
+# region redis
+
+redis_port = 6379
+redis_host = "REDIS_HOST"
+redis_client = redis.Redis(host=redis_host , port=redis_port , db=0, decode_responses=True)
 
 
-@manager.user_loader()
-def load_user(email: str):
+def set_token(username, token):
+    redis_client.set(token, username)
+
+
+def get_token(token):
+    return redis_client.get(token)
+
+
+def delete_token(token: str):
+    deleted = redis_client.delete(token)
+    if deleted == 0:
+        raise ValueError("Token not found in Redis.")
+    else:
+        print(f"Token {token} deleted from Redis.")
+        
+        
+# endregion
+
+
+# region Fonksiyonlarım
+
+async def load_user(email: str):
     return dbSorgu("select * from users where mail=%s", (email,), True)
 
 
-@app.post('/api/user/auth/token', tags=["users"])
-def login(data: OAuth2PasswordRequestForm = Depends()):
-    email = data.username
-    password = data.password
+def create_access_token(username: str) -> str:
+    # tokenın son kullanma tarihi
+    expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expires_date = datetime.utcnow() + expires_delta
 
-    user = load_user(email)
-    if not user:
-        raise InvalidCredentialsException  # you can also use your own HTTPException
-    elif password != user['password']:
-        raise InvalidCredentialsException
+    # token bilgileri
+    token_inf = {"sub": username, "exp": expires_date}
 
-    access_token = manager.create_access_token(
-        data=dict(sub=email)
-    )
+    # token oluşturma
+    token = jwt.encode(token_inf, SECRET_KEY, algorithm="HS256")
 
-    return {'username': user['username'], 'token': access_token, 'tokenType': 'bearer'}
+    return token
 
 
-@app.post("/api/user/register", response_model=ResponseMessage, tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
-def create_user(user: User, res: Response):
-
-    mail = user.mail
-    username = user.username
-    password = user.password
-
-    user = dbSorgu("select * from users where mail=(%s)", (user.mail,), True)
-
-    if user:
-        res.status_code = 400
-        return {'message': 'kayitli'}
-    else:
-        res.status_code = 201
-        dbPost("insert into users (username , mail , password) values (%s , %s , %s)",
-               (username, mail, password))
-        return {'message': 'kayit basarili'}
-
-# endregion
-
-# region Ürün işlemleri
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    # Redis veritabanından token'ın geçerli olup olmadığını kontrol edin
+    username = get_token(token)
+    print(username)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    return username
 
 
 def load_product(id: int = None):
@@ -198,24 +192,93 @@ def load_product(id: int = None):
     return dbSorgu("select * from products where id=%s", (id,), True)
 
 
-@app.get('/api/products', tags=['Products'])
-def get_products():
-    return load_product()
+# endregion
 
 
-@app.post('/api/product/update', tags=['Products'], response_model=ResponseMessage)
-def update_product(product: Product, username: str, res: Response):
+# region kullanıcı işlemleri
 
-    dbPost("UPDATE products SET lastprice = %s WHERE id= %s",
-           (product.lastprice, product.id))
-    dbPost("UPDATE products SET username = %s WHERE id= %s",
-           (username, product.id))
-    return {'message': 'asd'}
+@app.post("/register", response_model=ResponseMessage, tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
+async def create_user(user: User, res: Response):
+
+
+    # kullanıcının mail adresine kayıtlı user_id var mı diye kontrol ediyor
+    if await load_user(user.email) != None:
+        res.status_code = 400
+        return {'message': 'User already exists'}
+
+    # eğer bulamazsa user id oluşturuyor maile value olarak veriliyor ve user id ye de hash set veriliyor
+
+    username = user.username
+    email = user.email
+    password = user.password
+
+    dbPost("insert into users (username , mail , password) values (%s , %s , %s)",
+           (username, email, password))
+
+    res.status_code = 201
+    return {'message': 'successfully registered'}
+
+
+@app.post("/login", tags=["users"], responses={400: {'model': ResponseMessage}, 201: {'model': ResponseMessage}})
+async def login(credentials: HTTPBasicCredentials):
+
+    # username burada email olarak alınıyor
+    email = credentials.username
+    password = credentials.password
+
+    user = await load_user(email)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if password != user['password']:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    username = user['username']
+
+    token = create_access_token(username)
+    set_token(username, token)
+
+    return {'token': token , 'tokenType' : 'Bearer', 'username' : username}
+
+
+@app.post("/logout", tags=["users"])
+def logout(token: str = Depends(oauth2_scheme)):
+    delete_token(token)
+    return {"message": "Successfully logged out."}
+
+
+@app.get("/protected")
+def protected_route(current_user: str = Depends(get_current_user)):
+    # Korumalı rotanın gerçek işlemini burada gerçekleştirin
+    return {"username": current_user}
+# endregion
+
+
+# region websocket tanımlama
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_json(message)
+
+
+wsManager = ConnectionManager()
 
 # endregion
 
-# region Açık Arttırma WS
 
+# region websocket dinleme
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -234,13 +297,8 @@ async def websocket_endpoint(websocket: WebSocket):
                            (message["bid"], message["username"], message["id"],))
                     await wsManager.broadcast(dbSorgu("select * from products order by id"))
 
-
     except WebSocketDisconnect:
         wsManager.disconnect(websocket)
-    
-
 
 # endregion
 
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
