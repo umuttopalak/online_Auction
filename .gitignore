@@ -5,3 +5,5 @@ node_modules
 .venv
 .flaskenv
 gitattributes
+data
+asd.py
