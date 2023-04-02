@@ -1,4 +1,9 @@
 version: "3.9"
+
+networks:
+  default:
+    driver: bridge
+
 services:
   db:
     container_name: postgres
@@ -9,10 +14,10 @@ services:
       POSTGRES_DB: database
     ports:
       - "5432:5432"
-
-    #localde yedekleme
-    # volumes:
-    #   - ./data:/var/lib/postgresql/data
+    networks:
+      - default
+    volumes:
+      - ./data:/var/lib/postgresql/data
 
     healthcheck:
       test:
@@ -34,14 +39,37 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql://postgres:secretpass@db:5432/database
+      REDIS_HOST: redis
+    networks:
+      - default
 
   react-app:
     container_name: react-app
     image: react-image:latest
     build: ./frontend
-    # volumes:
-    #   - ./src:/app/src
+    volumes:
+      - ./src:/app/src
     ports:
       - 3000:80
+    networks:
+      - default
+
+  redis:
+    container_name: redis
+    image: redis:latest
+    restart: always
+    entrypoint: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    networks:
+      - default
+    ports:
+      - "6379:6379"
+    volumes:
+      - /appdata/redis/data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      REDIS_HOST: redis
