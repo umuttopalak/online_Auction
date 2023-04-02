@@ -6,8 +6,6 @@
   opacity: 1;
 }
 
-
-
 body {
   font-family: "Poppins", sans-serif !important;
   font-weight: 300 !important;
@@ -98,7 +96,7 @@ h6 span {
 }
 
 .card-body {
-  background-color: darksalmon;
+  background-color: #587f68;
   border-radius: 0 0 6px 6px;
 }
 
