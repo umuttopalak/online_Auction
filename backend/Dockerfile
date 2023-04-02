@@ -9,5 +9,6 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app
 
 ENV DATABASE_URL=postgresql://postgres:secretpass@db:5432/database
+ENV REDIS_URL=redis://redis:6379/0
 
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
