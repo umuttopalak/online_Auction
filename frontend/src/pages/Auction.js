@@ -64,15 +64,15 @@ function Auction(props) {
               <img className="card-img-top" src={require('../photos/' + product.id + '.jpg')} alt="bulunamadı" />
               <div className="card-body" style={{ border: "0px !important", borderRadius: "0px !important" }}>
                 <h5 className="card-title">{product.name}</h5>
-                <p className="card-text"><strong>Son Teklifi Veren:</strong> {product.username === null ? ("Henüz Teklif Verilmedi") : product.username}</p>
-                <p className="card-text"><strong>En Yüksek Teklif: </strong>{product.lastprice === 0 ? "Teklif Verilmedi" : `${product.lastprice} TL`}</p>
-                <p className="card-text"><strong>Başlangıç Fiyatı: </strong>{product.price}</p>
+                <p className="card-text"><strong>Bidder:</strong> {product.username === null ? ("No Offer") : product.username}</p>
+                <p className="card-text"><strong>Bid: </strong>{product.lastprice === 0 ? "No Offer" : `${product.lastprice} TL`}</p>
+                <p className="card-text"><strong>Starting Price : </strong>{product.price}</p>
                 <div className="d-flex justify-content-between align-items-center">
                   <div className="btn-group">
                     {product.username === username ? (
-                      <p className="btn">TEKLİF VERİLDİ</p>
+                      <p className="btn">Offered</p>
                     ) : (
-                      <button className="btn" type="button" onClick={() => handleClick(product.id, product.price, product.lastprice)}>Teklif Ver</button>
+                      <button className="btn" type="button" onClick={() => handleClick(product.id, product.price, product.lastprice)}>Offer</button>
                     )}
                   </div>
                 </div>

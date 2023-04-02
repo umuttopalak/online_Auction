@@ -138,7 +138,7 @@ const LogReg = () => {
                                                     </div>
                                                     <br />
                                                     {showError && <p style={{ color: 'red' }}>Email or Password is Incorrect</p>}
-                                                    <button className="btn mt-4" type='submit'>Submit</button>
+                                                    <button className="btn mt-4" type='submit'>Log In</button>
                                                 </div>
                                             </form>
                                         </div>
