@@ -132,7 +132,7 @@ addProducts()
 # region redis
 
 redis_port = 6379
-redis_host = "REDIS_HOST"
+redis_host = os.getenv('REDIS_HOST')
 redis_client = redis.Redis(host=redis_host , port=redis_port , db=0, decode_responses=True)
 
 
