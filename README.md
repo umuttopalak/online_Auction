@@ -1,8 +1,3 @@
-# internshipProject
- 
- registrationKey = ede044103af168a624f72f4c0a19d55cf4a76aad064547a8952c9394c69cfccc
- 
- ---
 # Çalıştırmak İçin;
 
 Backend;
